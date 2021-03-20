@@ -6,7 +6,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
  
 set (LEXER_SRC "${PROJECT_SOURCE_DIR}/expr.l")
 set (PARSER_SRC "${PROJECT_SOURCE_DIR}/expr.y")
- 
+set (TREE_SRC "${PROJECT_SOURCE_DIR}/ast.tc") 
+
+# Run treecc to generate ast
+add_custom_command (
+    OUTPUT ast.h ast.cpp
+    COMMAND treecc -o ast.cpp -h ast.h  ${TREE_SRC}
+    MAIN_DEPENDENCY ${PARSER_SRC}
+)
+
 # Run bison to generate the parser
 add_custom_command (
     OUTPUT tokens.h expr_parser.cpp
@@ -26,4 +34,5 @@ include_directories(${PROJECT_SOURCE_DIR})
  
 add_executable(${PROJECT_NAME}  expr_lexer.cpp
                                 expr_parser.cpp
+                                ast.cpp
                                 main.cpp)

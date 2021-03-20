@@ -1,0 +1,554 @@
+%option lang = "C++"
+%option namespace = "Ast"
+
+%decls %{
+// Header File
+#include <unordered_map>
+#include <iostream>
+#include <vector>
+#include <string>
+#include <sstream>
+#include <algorithm>
+namespace Ast{ class Expr; }
+using list = std::vector<Ast::Expr*>;
+using IdList = std::vector<std::string>;
+using stdstring = std::string;
+%}
+
+%{
+// Source file
+#include "ast.h"
+std::unordered_map<std::string, std::string> vars;
+int temp_index = 0;
+int label_counter = 0;
+stdstring newTemp(){
+    return "dword[temp"+std::to_string(temp_index++)+"]";
+}
+stdstring newVar(std::string id, std::string dt){
+    vars.emplace(id, dt);
+    return "dword["+id+"]";
+}
+stdstring newLabel(){
+    return "Label"+std::to_string(label_counter++);
+}
+void resetTemp(){
+    temp_index = 0;
+}
+%}
+
+%node Expr %abstract %typedef = {
+    %nocreate stdstring place;
+    %nocreate stdstring code; 
+}
+
+%node BinaryExpr Expr %abstract = {
+    Expr *expr1;
+    Expr *expr2;
+}
+
+%node SubType %abstract %typedef = {
+    %nocreate stdstring name;
+}
+
+
+%node Int_Type SubType
+%node Char_Type SubType
+%node Bool_Type SubType
+
+%node AddExpr BinaryExpr
+%node SubExpr BinaryExpr
+%node MulExpr BinaryExpr
+%node DivExpr BinaryExpr
+%node ModExpr BinaryExpr
+%node EqExpr BinaryExpr
+%node GtExpr BinaryExpr
+%node LtExpr BinaryExpr
+%node GetExpr BinaryExpr
+%node LetExpr BinaryExpr
+%node NeqExpr BinaryExpr
+%node OrExpr BinaryExpr
+%node AndExpr BinaryExpr
+
+%node UnaryExpr Expr = {
+    Expr *expr;
+}
+
+%node NumExpr Expr = {
+    int val;
+}
+
+%node IdExpr Expr = {
+    stdstring id;
+}
+
+%node VarName Expr = {
+    stdstring id;
+}
+
+%node VarDecl Expr = {
+    SubType *type;
+    IdList *ids;
+}
+
+%node AssignExpr Expr = {
+    stdstring id;
+    Expr *expr;
+}
+
+%node PrintExpr Expr = {
+    Expr *expr;
+}
+
+%node IfExpr Expr = {
+    Expr *cond;
+    Expr *trueExpr;
+    Expr *falseExpr;
+}
+
+%node WhileExpr Expr = {
+    Expr *cond;
+    Expr *block;
+}
+
+%node ExprList Expr = {
+    list expr_list;
+}
+
+%node RootExpr Expr = {
+
+}
+
+%node NotExpr Expr = {
+    Expr *expr;
+}
+
+%node VarSection Expr = {
+    list varDecls;
+}
+
+%node ArrayType Expr = {
+    Expr *size;
+    Expr *Type;
+}
+
+%operation void genCode (Expr *e) 
+%operation void subT(SubType *s)
+
+subT(SubType){}
+
+subT(Int_Type){
+    s->name = "Entero";
+}
+
+subT(Char_Type){
+    s->name = "Char";
+}
+
+subT(Bool_Type){
+    s->name = "Booleano";
+}
+
+genCode(AddExpr)
+{   
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place = e->expr1->place;
+
+    std::ostringstream out;
+
+    out << e->expr1->code << "\n"
+        << e->expr2->code << "\n"
+        << "mov eax, " << e->expr2->place << "\n"
+        << "add " << e->place << ", eax\n";
+
+
+    e->code = out.str();
+}
+
+genCode(SubExpr)
+{
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place = e->expr1->place;
+
+    std::ostringstream out;
+
+    out << e->expr1->code << "\n"
+        << e->expr2->code << "\n"
+        << "mov eax, " << e->expr2->place << "\n"
+        << "sub " << e->place << ", eax\n";
+    
+    e->code = out.str();
+}
+
+genCode(MulExpr){
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place = e->expr1->place;
+
+    std::ostringstream out;
+
+    out << e->expr1->code << "\n"
+        << e->expr2->code << "\n"
+        << "mov eax, " << e->expr1->place << "\n"
+        << "mul " << e->expr2->place << "\n"
+        << "mov " << e->place << ", eax\n";
+    
+    e->code = out.str();
+}
+
+genCode(DivExpr)
+{
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place = e->expr1->place;
+
+    std::ostringstream out;
+
+    out << e->expr1->code << "\n"
+        << e->expr2->code << "\n"
+        << "mov eax, " << e->expr1->place << "\n"
+        << "mov edx, 0\n"
+        << "div " << e->expr2->place << "\n"
+        << "mov " << e->place << ", eax\n";
+    
+    e->code = out.str();
+}
+
+genCode(ModExpr)
+{
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place = e->expr1->place;
+
+    std::ostringstream out;
+
+    out << e->expr1->code << "\n"
+        << e->expr2->code << "\n"
+        << "mov eax, " << e->expr1->place << "\n"
+        << "mov edx, 0\n"
+        << "div " << e->expr2->place << "\n"
+        << "mov " << e->place << ", edx\n";
+    
+    e->code = out.str();
+}
+
+genCode(OrExpr){
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place= newTemp();
+
+    std::ostringstream out;
+
+    out << e->expr1->code << '\n'
+        << e->expr2->code << '\n'
+        << "mov ecx, " << e->expr1->place << '\n'
+        << "mov " << e->place << ", ecx\n"
+        << "mov ecx, " << e->expr2->place << "\n"
+        << "or " << e->place << ", ecx\n"; 
+
+    e->code = out.str();
+}
+
+genCode(AndExpr){
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place= newTemp();
+
+    std::ostringstream out;
+
+    out << e->expr1->code << '\n'
+        << e->expr2->code << '\n'
+        << "mov ecx, " << e->expr1->place << '\n'
+        << "xor eax, eax\n"
+        << "cmp 1, ecx\n"
+        << "sete al\n"
+        << "mov "<< e->place << ", eax\n"
+        << "xor eax, eax\n"
+        << "mov ecx, " << e->expr2->place << '\n'
+        << "cmp 1, ecx\n"
+        << "sete al\n"
+        << "cmp " << e->place << ", eax\n"
+        << "sete al\n"
+        << "mov "<<e->place <<", eax\n";
+
+    e->code = out.str();
+}
+
+genCode(UnaryExpr){
+    genCode(e->expr);
+
+    std::ostringstream out;
+
+    out << "mov eax, " << e->expr->place << "\n"
+	    << "imul eax, -1\n"
+        << "mov " << e->place << ", eax\n";
+}
+
+genCode(NotExpr){
+    genCode(e->expr);
+
+    std::ostringstream out;
+    out << "mov eax" << e->expr->place << "\n"
+        << "mov " << e->place << ", eax\n"
+        << "not " << e->place << "\n";
+
+    e->code = out.str();
+}
+
+genCode(NumExpr)
+{
+    e->place = newTemp();
+    e->code = "mov " + e->place + ", " + std::to_string(e->val);
+}
+
+genCode(IdExpr){
+    e->place = "dword["+e->id+"]";
+}
+
+genCode(AssignExpr){
+    genCode(e->expr);
+
+    std::ostringstream out;
+
+    std::unordered_map<std::string,std::string>::const_iterator got = vars.find(e->id);
+
+    if ( got == vars.end() ){
+        
+    }
+    else{
+       e->place = "dword["+e->id+"]";
+    }
+    
+    out << e->expr->code << "\n"
+        << "mov eax, " + e->expr->place << "\n"
+        << "mov " + e->place + ", eax\n";
+
+    e->code = out.str();
+}
+
+genCode(EqExpr){
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place= newTemp();
+
+    
+
+    std::ostringstream out;
+
+    out << e->expr1->code << '\n'
+        << e->expr2->code << '\n'
+        << "mov ecx, " << e->expr2->place << '\n'
+        << "xor eax, eax\n"
+        << "cmp " << e->expr1->place << " , ecx\n"
+        << "sete al\n"
+        << "mov "<< e->place << ", eax\n";
+
+    std::cout<<"EqExpr\n";
+
+    e->code = out.str();
+}
+
+genCode(GtExpr){
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place= newTemp();
+
+    std::ostringstream out;
+
+    out << e->expr1->code << '\n'
+        << e->expr2->code << '\n'
+        << "mov ecx, " << e->expr2->place << '\n'
+        << "xor eax, eax\n"
+        << "cmp " << e->expr1->place << " , ecx\n"
+        << "setg al\n"
+        << "mov "<< e->place << ", eax\n";
+
+    e->code = out.str();
+}
+
+genCode(LtExpr){
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place= newTemp();
+
+    std::ostringstream out;
+
+    out << e->expr1->code << '\n'
+        << e->expr2->code << '\n'
+        << "mov ecx, " << e->expr2->place << '\n'
+        << "xor eax, eax\n"
+        << "cmp " << e->expr1->place << " , ecx\n"
+        << "setl al\n"
+        << "mov "<< e->place << ", eax\n";
+
+    e->code = out.str();
+}
+
+genCode(GetExpr){
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place= newTemp();
+
+    std::ostringstream out;
+
+    out << e->expr1->code << '\n'
+        << e->expr2->code << '\n'
+        << "mov ecx, " << e->expr2->place << '\n'
+        << "xor eax, eax\n"
+        << "cmp " << e->expr1->place << " , ecx\n"
+        << "setge al\n"
+        << "mov "<< e->place << ", eax\n";
+
+    e->code = out.str();
+}
+
+genCode(LetExpr){
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place= newTemp();
+
+    std::ostringstream out;
+
+    out << e->expr1->code << '\n'
+        << e->expr2->code << '\n'
+        << "mov ecx, " << e->expr2->place << '\n'
+        << "xor eax, eax\n"
+        << "cmp " << e->expr1->place << " , ecx\n"
+        << "setle al\n"
+        << "mov "<< e->place << ", eax\n";
+
+    e->code = out.str();
+}
+
+genCode(NeqExpr){
+    genCode(e->expr1);
+    genCode(e->expr2);
+
+    e->place= newTemp();
+
+    std::ostringstream out;
+
+    out << e->expr1->code << '\n'
+        << e->expr2->code << '\n'
+        << "mov ecx, " << e->expr2->place << '\n'
+        << "xor eax, eax\n"
+        << "cmp " << e->expr1->place << " , ecx\n"
+        << "setne al\n"
+        << "mov "<< e->place << ", eax\n";
+
+    e->code = out.str();
+}
+
+genCode(PrintExpr){
+    genCode(e->expr);
+
+
+    std::ostringstream out;
+
+    out << e->expr->code << "\n"
+        << "push " << e->expr->place<<"\n"
+        << "push format\n"
+        << "call printf\n"
+        << "add esp, 8\n";
+
+
+    e->code = out.str();
+}
+
+genCode(IfExpr){
+    genCode(e->cond);
+    
+
+    std::ostringstream out;
+
+    std::string elselbl;
+    std::string endIflbl;
+
+    if(e->falseExpr != nullptr){
+        genCode(e->trueExpr);
+        genCode(e->falseExpr);
+        elselbl = newLabel();
+        endIflbl = newLabel();
+        out << e->cond->code << "\n"
+            <<"cmp " << e->cond->place << ", 0\n"
+            <<"je " << elselbl << "\n"
+            << e->trueExpr->code <<"\n"
+            << "jmp " << endIflbl << "\n"
+            << elselbl << ":\n"
+            << e->falseExpr->code<<"\n"
+            << endIflbl << ":\n";
+    }
+    else{
+        genCode(e->trueExpr);
+        endIflbl = newLabel();
+        out << e->cond->code << "\n"
+            << "cmp " << e->cond->place << ", 0\n"
+            << "je " << endIflbl << "\n"
+            << e->trueExpr->code << "\n"
+            << endIflbl << ":\n";
+    }
+    
+    e->code = out.str();
+}
+
+genCode(WhileExpr){
+    std::string trueLbl;
+    std::string falseLbl;
+
+    genCode(e->cond);
+    genCode(e->block);
+
+    std::ostringstream out;
+
+    trueLbl = newLabel();
+    falseLbl = newLabel();
+
+    std::cout<<trueLbl;
+
+    out << trueLbl << ":\n"
+        << e->cond->code << "\n"
+        << "cmp " << e->cond->place << ", 0\n"
+        << "je " << falseLbl << "\n"
+        << e->block->code << "\n"
+        << "jmp " << trueLbl << "\n"
+        << falseLbl <<": \n";
+
+    e->code = out.str();
+}
+
+genCode(ExprList){
+    for(const auto& l: e->expr_list){
+        genCode(l);
+        e->place = l->place;
+        e->code = l->code;
+    }
+}
+
+genCode(VarDecl){
+    subT(e->type);
+    std::string type = e->type->name;
+    for(const auto &id : *e->ids){
+        newVar(id, type);
+    }
+}
+
+genCode(VarSection){
+    for(const auto &i : e->varDecls){
+        genCode(i);
+    }
+}
+
+genCode(Expr){}

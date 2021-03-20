@@ -1,11 +1,17 @@
 #include <iostream>
 #include <stdexcept>
 #include "tokens.h"
+#include <sstream>
 
 extern Expr::Parser::token_type yylex(Expr::Parser::semantic_type *yylval);
 extern char *yytext;
 
-void ExeParser();
+extern int temp_index;
+extern int yylineno;
+extern std::unordered_map<std::string, std::string> vars;
+std::ostringstream out;
+std::vector<Ast::Expr*> expr_list;
+
 std::string TokenToString(Expr::Parser::token::yytokentype tk){
     switch(tk){
         case Expr::Parser::token::YYEOF: return "YYEOF";                   
@@ -67,7 +73,6 @@ std::string TokenToString(Expr::Parser::token::yytokentype tk){
         case Expr::Parser::token::OPADD: return "OPADD";
         case Expr::Parser::token::OPSUB: return "OPSUB";
         case Expr::Parser::token::OPMUL: return "OPMUL";
-        case Expr::Parser::token::OPDIV: return "OPDIV";
         case Expr::Parser::token::OpExponente: return "OpExponente";
         case Expr::Parser::token::OpLT: return "OpLT";
         case Expr::Parser::token::OpGT: return "OpGT";
@@ -93,9 +98,48 @@ void ExeLexer(){
     }
 }
 
+void ExeParser(){
+    Expr::Parser parser(expr_list);
+    try{
+        parser();
+    }
+    catch(std::string& ex){
+        std::cerr << ex << '\n';
+    }
+
+    for(auto &&i : expr_list){
+        Ast::genCode(i);
+    }
+
+    out << "extern printf\n"
+        << "global main\n\n"
+        << "section .data\n"
+        << "format db '%d',0\n";
+
+    for(int i = 0; i < temp_index; i++){
+        
+        out << "temp" << std::to_string(i) << " dd 0\n";
+    }
+
+    for(auto &&i:vars){
+        out << i.first << " dd 0 \n";
+    }
+
+    out << "\nsection .text\n\n"
+        << "main: \n";
+
+    for(auto &&i : expr_list){
+        out << i->code << "\n";
+    }
+
+    std::cout<<out.str();
+}
+
 int main(){
     
-    ExeLexer();
+    //ExeLexer();
+   
+    ExeParser();
 
     return 0; 
 }
