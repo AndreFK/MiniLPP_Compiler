@@ -18,19 +18,25 @@ using stdstring = std::string;
 %{
 // Source file
 #include "ast.h"
+
 std::unordered_map<std::string, std::string> vars;
+
 int temp_index = 0;
 int label_counter = 0;
+
 stdstring newTemp(){
     return "dword[temp"+std::to_string(temp_index++)+"]";
 }
+
 stdstring newVar(std::string id, std::string dt){
     vars.emplace(id, dt);
     return "dword["+id+"]";
 }
+
 stdstring newLabel(){
     return "Label"+std::to_string(label_counter++);
 }
+
 void resetTemp(){
     temp_index = 0;
 }
@@ -130,6 +136,7 @@ void resetTemp(){
     Expr *size;
     Expr *Type;
 }
+
 
 %operation void genCode (Expr *e) 
 %operation void subT(SubType *s)
@@ -314,8 +321,9 @@ genCode(IdExpr){
 }
 
 genCode(AssignExpr){
+    
     genCode(e->expr);
-
+    
     std::ostringstream out;
 
     std::unordered_map<std::string,std::string>::const_iterator got = vars.find(e->id);
@@ -550,5 +558,4 @@ genCode(VarSection){
         genCode(i);
     }
 }
-
 genCode(Expr){}
