@@ -104,7 +104,7 @@ namespace Expr{
 %token stringConstant
 %token charConstant
 %token <std::string> ID "id"
-%token intConstant "number"
+%token <int>intConstant "number"
 %token ERROR
 
 %left OpEqual OpNotEqual OpLT OpGT OpLE OpGE
@@ -114,7 +114,7 @@ namespace Expr{
 %right OpExponente
 
 %type <Ast::Expr*> program expr term factor rvalue variable_decl exponent variable_section assign
-%type <Ast::Expr*> statement statement_list argument_list lvalue
+%type <Ast::Expr*> statement statement_list argument_list lvalue constants
 %type <Ast::SubType*> type
 %type <IdList*> id_list
 %%
@@ -130,6 +130,7 @@ program: opt_subtype_definition_section
          eols
          KwFin
          opt_eols
+         
         ;
 
 opt_subtype_definition_section: subtype_definition_section eols
@@ -201,8 +202,16 @@ argument_decl_list: argument_decl_list OpComma type ID
                 |   type ID
                 |   KwVar type ID;
 
-statement_list: statement_list eols statement {$$ = $3;}
-            |   statement {$$ = $1;};
+statement_list: statement_list eols statement 
+            {
+                $$ = $1;
+                expr_list.push_back($3);
+            }
+            |   statement 
+            {
+                $$ = $1; 
+                expr_list.push_back($1);
+            };
 
 statement: assign { $$ = $1; }
         |  KwLlamar ID
@@ -261,13 +270,13 @@ exponent: exponent OpExponente rvalue
         | rvalue {$$ = $1;};
 
 rvalue: OPPAR expr CLOSEPAR {$$ = $2;}
-    |   constants 
+    |   constants {$$ = $1;}
     |   lvalue {$$ = $1;}
     |   subprogram_call 
     |   OPSUB expr {$$ = new Ast::UnaryExpr($2);}
     |   OpNot expr {$$ = new Ast::NotExpr($2);};
 
-constants: intConstant
+constants: intConstant {$$ = new Ast::NumExpr($1);}
         |  charConstant
         |  OpTrue
         |  OpFalse;
