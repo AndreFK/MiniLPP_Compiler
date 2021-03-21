@@ -20,12 +20,22 @@ using stdstring = std::string;
 #include "ast.h"
 
 std::unordered_map<std::string, std::string> vars;
-
+std::string xd = "";
 int temp_index = 0;
+int char_temp_index = 0;
+int string_temp_index = 0;
 int label_counter = 0;
 
 stdstring newTemp(){
     return "dword[temp"+std::to_string(temp_index++)+"]";
+}
+
+std::string newCharTemp(){
+    return "dword[charTemp"+std::to_string(char_temp_index++)+"]";
+}
+
+std::string newStringTemp(){
+    return "stringTemp"+std::to_string(string_temp_index++);
 }
 
 stdstring newVar(std::string id, std::string dt){
@@ -45,6 +55,7 @@ void resetTemp(){
 %node Expr %abstract %typedef = {
     %nocreate stdstring place;
     %nocreate stdstring code; 
+    %nocreate stdstring data_type;
 }
 
 %node BinaryExpr Expr %abstract = {
@@ -81,6 +92,17 @@ void resetTemp(){
 
 %node NumExpr Expr = {
     int val;
+}
+
+%node TrueExpr Expr 
+%node FalseExpr Expr
+
+%node CharExpr Expr = {
+    stdstring val;
+}
+
+%node StringExpr Expr = {
+    stdstring val;
 }
 
 %node IdExpr Expr = {
@@ -171,6 +193,7 @@ genCode(AddExpr)
 
 
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(SubExpr)
@@ -188,6 +211,7 @@ genCode(SubExpr)
         << "sub " << e->place << ", eax\n";
     
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(MulExpr){
@@ -205,6 +229,7 @@ genCode(MulExpr){
         << "mov " << e->place << ", eax\n";
     
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(DivExpr)
@@ -224,6 +249,7 @@ genCode(DivExpr)
         << "mov " << e->place << ", eax\n";
     
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(ModExpr)
@@ -243,6 +269,7 @@ genCode(ModExpr)
         << "mov " << e->place << ", edx\n";
     
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(OrExpr){
@@ -261,6 +288,7 @@ genCode(OrExpr){
         << "or " << e->place << ", ecx\n"; 
 
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(AndExpr){
@@ -287,6 +315,7 @@ genCode(AndExpr){
         << "mov "<<e->place <<", eax\n";
 
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(UnaryExpr){
@@ -297,6 +326,9 @@ genCode(UnaryExpr){
     out << "mov eax, " << e->expr->place << "\n"
 	    << "imul eax, -1\n"
         << "mov " << e->place << ", eax\n";
+        
+    e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(NotExpr){
@@ -308,16 +340,43 @@ genCode(NotExpr){
         << "not " << e->place << "\n";
 
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(NumExpr)
 {
     e->place = newTemp();
     e->code = "mov " + e->place + ", " + std::to_string(e->val);
+    e->data_type = "Entero";
+}
+
+genCode(TrueExpr){
+    e->place = newTemp();
+    e->code = "mov " + e->place + ", 1";
+    e->data_type = "Entero";
+}
+
+genCode(FalseExpr){
+    e->place = newTemp();
+    e->code = "mov " + e->place + ", 0";
+    e->data_type = "Entero";
+}
+
+genCode(CharExpr){
+    e->place = newCharTemp();
+    e->code = "mov " + e->place + ", \"" + e->val + "\"";
+    e->data_type = "Char";
+}
+
+genCode(StringExpr){
+    e->place = newStringTemp();
+    xd = e->val;
+    e->data_type = "String";
 }
 
 genCode(IdExpr){
     e->place = "dword["+e->id+"]";
+    e->data_type = vars[e->id];
 }
 
 genCode(AssignExpr){
@@ -340,6 +399,8 @@ genCode(AssignExpr){
         << "mov " + e->place + ", eax\n";
 
     e->code = out.str();
+
+    e->data_type = vars[e->id];
 }
 
 genCode(EqExpr){
@@ -363,6 +424,7 @@ genCode(EqExpr){
     std::cout<<"EqExpr\n";
 
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(GtExpr){
@@ -382,6 +444,7 @@ genCode(GtExpr){
         << "mov "<< e->place << ", eax\n";
 
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(LtExpr){
@@ -401,6 +464,7 @@ genCode(LtExpr){
         << "mov "<< e->place << ", eax\n";
 
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(GetExpr){
@@ -420,6 +484,7 @@ genCode(GetExpr){
         << "mov "<< e->place << ", eax\n";
 
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(LetExpr){
@@ -439,6 +504,7 @@ genCode(LetExpr){
         << "mov "<< e->place << ", eax\n";
 
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(NeqExpr){
@@ -458,6 +524,7 @@ genCode(NeqExpr){
         << "mov "<< e->place << ", eax\n";
 
     e->code = out.str();
+    e->data_type = "Entero";
 }
 
 genCode(PrintExpr){
@@ -466,14 +533,30 @@ genCode(PrintExpr){
 
     std::ostringstream out;
 
+    if(e->expr->data_type == "Char"){
+
     out << e->expr->code << "\n"
+        << "push " << e->expr->place<<"\n"
+        << "push formatC\n"
+        << "call printf\n"
+        << "add esp, 8\n";
+
+    }
+    else if(e->expr->data_type == "String"){
+    out << e->expr->code << "\n"
+        << "push " << e->expr->place<<"\n"
+        << "call printf\n"
+        << "add esp, 4\n";
+    }
+    else{
+        out << e->expr->code << "\n"
         << "push " << e->expr->place<<"\n"
         << "push format\n"
         << "call printf\n"
         << "add esp, 8\n";
-
-
+    }
     e->code = out.str();
+    e->data_type = "None";
 }
 
 genCode(IfExpr){
@@ -510,6 +593,7 @@ genCode(IfExpr){
     }
     
     e->code = out.str();
+    e->data_type = "None";
 }
 
 genCode(WhileExpr){
@@ -535,6 +619,7 @@ genCode(WhileExpr){
         << falseLbl <<": \n";
 
     e->code = out.str();
+    e->data_type = "None";
 }
 
 genCode(ExprList){
@@ -542,6 +627,7 @@ genCode(ExprList){
         genCode(l);
         e->place = l->place;
         e->code = l->code;
+        e->data_type = l->data_type;
     }
 }
 
@@ -551,11 +637,13 @@ genCode(VarDecl){
     for(const auto &id : *e->ids){
         newVar(id, type);
     }
+    e->data_type = type;
 }
 
 genCode(VarSection){
     for(const auto &i : e->varDecls){
         genCode(i);
     }
+    e->data_type = "None";
 }
 genCode(Expr){}

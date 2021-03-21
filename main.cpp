@@ -7,7 +7,10 @@ extern Expr::Parser::token_type yylex(Expr::Parser::semantic_type *yylval);
 extern char *yytext;
 
 extern int temp_index;
+extern int char_temp_index;
+extern int string_temp_index;
 extern int yylineno;
+extern std::string xd;
 extern std::unordered_map<std::string, std::string> vars;
 std::ostringstream out;
 std::vector<Ast::Expr*> expr_list;
@@ -114,15 +117,32 @@ void ExeParser(){
     out << "extern printf\n"
         << "global main\n\n"
         << "section .data\n"
-        << "format db '%d',0\n";
+        << "format db '%d',0\n"
+        << "formatC db '%c',0\n"
+        << "formatS db '%s',0\n";
 
     for(int i = 0; i < temp_index; i++){
         
         out << "temp" << std::to_string(i) << " dd 0\n";
     }
 
+    for (int i = 0; i < char_temp_index; i++){
+        out << "charTemp" << std::to_string(i) << " db \"\"\n";
+    }
+
+    for (int i = 0; i < string_temp_index; i++){
+        out << "stringTemp" << std::to_string(i) << ": db " + xd + ", 0\n";
+    }
+
     for(auto &&i:vars){
-        out << i.first << " dd 0 \n";
+        if(i.second == "Char"){
+            out << i.first << " db \"\"\n";
+        }
+        else
+        {
+            out << i.first << " dd 0 \n";
+        }
+        
     }
 
     out << "\nsection .text\n\n"

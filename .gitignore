@@ -5,6 +5,8 @@
 *.o
 *.txt
 *.asm
+compile.sh
+output
 
 #Always Include This
 !CmakeList.txt

@@ -101,8 +101,8 @@ namespace Expr{
 %token OpNotEqual "<>"
 %token OpLE "<="
 %token OpGE ">="
-%token stringConstant
-%token charConstant
+%token <std::string>stringConstant
+%token <std::string>charConstant
 %token <std::string> ID "id"
 %token <int>intConstant "number"
 %token ERROR
@@ -139,8 +139,8 @@ subtype_definition_section: subtype_definition_section eols KwTipo ID KwEs type
                         |   KwTipo ID KwEs type;
 
 type:   KwEntero { $$ = new Ast::Int_Type();}
-    |   KwBooleano { $$ = new Ast::Char_Type();}
-    |   KwCaracter { $$ = new Ast::Bool_Type();}
+    |   KwBooleano { $$ = new Ast::Bool_Type();}
+    |   KwCaracter { $$ = new Ast::Char_Type();}
     |   array_type;
 
 array_type: KwArreglo OpenBracket intConstant CloseBracket KwDe type;
@@ -276,16 +276,16 @@ rvalue: OPPAR expr CLOSEPAR {$$ = $2;}
     |   OpNot expr {$$ = new Ast::NotExpr($2);};
 
 constants: intConstant {$$ = new Ast::NumExpr($1);}
-        |  charConstant
-        |  OpTrue
-        |  OpFalse;
+        |  charConstant {$$ = new Ast::CharExpr($1);}
+        |  OpTrue {$$ = new Ast::TrueExpr();}
+        |  OpFalse {$$ = new Ast::FalseExpr();};
 
 subprogram_call: ID OPPAR opt_expr_list CLOSEPAR;
 
 argument_list: argument_list OpComma expr
             |  argument_list OpComma stringConstant
             |  expr {$$ = $1;}
-            |  stringConstant;
+            |  stringConstant {$$ = new Ast::StringExpr($1);};
 
 if_statement: KwSi expr opt_eols
               KwEntonces opt_eols

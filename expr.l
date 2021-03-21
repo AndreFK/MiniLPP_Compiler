@@ -85,8 +85,8 @@ int yylineno = 1;
 "<=" return Expr::Parser::token::OpLE;
 ">=" return Expr::Parser::token::OpGE;
 
-"\""[^\n]+"\"" {return Expr::Parser::token::stringConstant;}
-"\'"[^\n']"\'" {return Expr::Parser::token::charConstant;}
+"\""[^\n]+"\"" {yylval->emplace<std::string>(yytext);return Expr::Parser::token::stringConstant;}
+"\'"[^\n']"\'" {std::string temp(yytext); std::string val = temp.substr(1,1); yylval->emplace<std::string>(val); return Expr::Parser::token::charConstant;}
 [0-9]+ {yylval->emplace<int>(atoi(yytext)); return Expr::Parser::token::intConstant;}
 "0x"[A-F0-9]+ {yylval->emplace<int>(std::stoi(yytext,nullptr,16)); return Expr::Parser::token::intConstant;}
 "0b"[0-1]+ {std::string temp(yytext); std::string value = temp.substr(2); yylval->emplace<int>(std::stoi(value,nullptr,2)); return Expr::Parser::token::intConstant;}
