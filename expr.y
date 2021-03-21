@@ -130,7 +130,6 @@ program: opt_subtype_definition_section
          eols
          KwFin
          opt_eols
-         
         ;
 
 opt_subtype_definition_section: subtype_definition_section eols
@@ -208,8 +207,8 @@ statement_list: statement_list eols statement
                 expr_list.push_back($3);
             }
             |   statement 
-            {
-                $$ = $1; 
+            {   
+                $$ = $1;
                 expr_list.push_back($1);
             };
 
@@ -270,7 +269,7 @@ exponent: exponent OpExponente rvalue
         | rvalue {$$ = $1;};
 
 rvalue: OPPAR expr CLOSEPAR {$$ = $2;}
-    |   constants {$$ = $1;}
+    |   constants 
     |   lvalue {$$ = $1;}
     |   subprogram_call 
     |   OPSUB expr {$$ = new Ast::UnaryExpr($2);}
