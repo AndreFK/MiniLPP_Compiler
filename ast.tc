@@ -25,6 +25,7 @@ int temp_index = 0;
 int char_temp_index = 0;
 int string_temp_index = 0;
 int label_counter = 0;
+int end_label = 0;
 
 stdstring newTemp(){
     return "dword[temp"+std::to_string(temp_index++)+"]";
@@ -45,6 +46,10 @@ stdstring newVar(std::string id, std::string dt){
 
 stdstring newLabel(){
     return "Label"+std::to_string(label_counter++);
+}
+
+std::string endLabel(){
+    return "end"+std::to_string(end_label++);
 }
 
 void resetTemp(){
@@ -130,11 +135,32 @@ void resetTemp(){
 %node IfExpr Expr = {
     Expr *cond;
     Expr *trueExpr;
-    Expr *falseExpr;
+    Expr *ElseIfExpr;
+    //Expr *falseExpr;
+}
+
+%node ElseIf Expr = {
+    Expr *cond;
+    Expr *block;
+}
+
+%node ElseExpr Expr = {
+    Expr *block;
 }
 
 %node WhileExpr Expr = {
     Expr *cond;
+    Expr *block;
+}
+
+%node DoWhileExpr Expr = {
+    Expr *block;
+    Expr *cond;
+}
+
+%node ForExpr Expr = {
+    Expr *assign;
+    Expr *limit;
     Expr *block;
 }
 
@@ -159,6 +185,7 @@ void resetTemp(){
     Expr *Type;
 }
 
+%node SubProgramExpr Expr= {}
 
 %operation void genCode (Expr *e) 
 %operation void subT(SubType *s)
@@ -179,6 +206,7 @@ subT(Bool_Type){
 
 genCode(AddExpr)
 {   
+
     genCode(e->expr1);
     genCode(e->expr2);
 
@@ -194,6 +222,7 @@ genCode(AddExpr)
 
     e->code = out.str();
     e->data_type = "Entero";
+
 }
 
 genCode(SubExpr)
@@ -379,12 +408,10 @@ genCode(IdExpr){
     e->data_type = vars[e->id];
 }
 
-genCode(AssignExpr){
-    
+genCode(AssignExpr){ 
     genCode(e->expr);
     
     std::ostringstream out;
-
     std::unordered_map<std::string,std::string>::const_iterator got = vars.find(e->id);
 
     if ( got == vars.end() ){
@@ -401,6 +428,7 @@ genCode(AssignExpr){
     e->code = out.str();
 
     e->data_type = vars[e->id];
+
 }
 
 genCode(EqExpr){
@@ -421,7 +449,7 @@ genCode(EqExpr){
         << "sete al\n"
         << "mov "<< e->place << ", eax\n";
 
-    std::cout<<"EqExpr\n";
+
 
     e->code = out.str();
     e->data_type = "Entero";
@@ -528,6 +556,8 @@ genCode(NeqExpr){
 }
 
 genCode(PrintExpr){
+
+
     genCode(e->expr);
 
 
@@ -557,6 +587,7 @@ genCode(PrintExpr){
     }
     e->code = out.str();
     e->data_type = "None";
+
 }
 
 genCode(IfExpr){
@@ -565,58 +596,124 @@ genCode(IfExpr){
 
     std::ostringstream out;
 
-    std::string elselbl;
-    std::string endIflbl;
+    std::string elseIflbl;
+    std::string end = endLabel();
 
-    if(e->falseExpr != nullptr){
-        genCode(e->trueExpr);
-        genCode(e->falseExpr);
-        elselbl = newLabel();
-        endIflbl = newLabel();
-        out << e->cond->code << "\n"
-            <<"cmp " << e->cond->place << ", 0\n"
-            <<"je " << elselbl << "\n"
-            << e->trueExpr->code <<"\n"
-            << "jmp " << endIflbl << "\n"
-            << elselbl << ":\n"
-            << e->falseExpr->code<<"\n"
-            << endIflbl << ":\n";
-    }
-    else{
-        genCode(e->trueExpr);
-        endIflbl = newLabel();
-        out << e->cond->code << "\n"
-            << "cmp " << e->cond->place << ", 0\n"
-            << "je " << endIflbl << "\n"
-            << e->trueExpr->code << "\n"
-            << endIflbl << ":\n";
-    }
+    genCode(e->trueExpr);
+    genCode(e->ElseIfExpr);
+    //genCode(e->falseExpr);
+    elseIflbl = newLabel();
+    out << e->cond->code << "\n"
+        <<"cmp " << e->cond->place << ", 0\n"
+        <<"je " << elseIflbl << "\n"
+        << e->trueExpr->code <<"\n"
+        << "jmp " <<end <<"\n"
+        << elseIflbl << ":\n"
+        << e->ElseIfExpr->code << "\n"
+        //<< e->falseExpr->code<<"\n"
+        << end << ":\n";
+    
     
     e->code = out.str();
     e->data_type = "None";
 }
 
-genCode(WhileExpr){
-    std::string trueLbl;
-    std::string falseLbl;
+genCode(ElseIf){
+    std::string elselbl = newLabel();
+    genCode(e->cond);
+    genCode(e->block);
 
+    int end = end_label - 1;
+    std::ostringstream out;
+
+    out << e->cond->code << "\n"
+        << "cmp " << e->cond->place << ", 0\n"
+        << "je " << elselbl << "\n"
+        << e->block->code << "\n"
+        << "jmp end"<<std::to_string(end)<<"\n"
+        <<  elselbl << ":\n";
+
+    e->code = out.str();
+    e->data_type = "None";
+}
+
+genCode(ElseExpr){
+    genCode(e->block);
+    std::ostringstream out;
+
+    out << e->block->code << "\n"
+        << "jmp end\n";
+
+    e->code = out.str();
+    e->data_type = "None";
+}
+
+genCode(WhileExpr){
+    
+    std::string start = newLabel();
+    std::string end = newLabel();
+    
     genCode(e->cond);
     genCode(e->block);
 
     std::ostringstream out;
 
-    trueLbl = newLabel();
-    falseLbl = newLabel();
-
-    std::cout<<trueLbl;
-
-    out << trueLbl << ":\n"
+    out << start << ":\n"
         << e->cond->code << "\n"
-        << "cmp " << e->cond->place << ", 0\n"
-        << "je " << falseLbl << "\n"
+        << "cmp " << e->cond->place << " ,0\n"
+        << "je " << end << "\n"
         << e->block->code << "\n"
-        << "jmp " << trueLbl << "\n"
-        << falseLbl <<": \n";
+        << "jmp " << start << "\n"
+        << end << ":\n"; 
+
+    e->code = out.str();
+    e->data_type = "None";
+
+}
+
+genCode(DoWhileExpr){
+    
+    std::string start = newLabel();
+    std::string end = newLabel();
+    
+    genCode(e->cond);
+    genCode(e->block);
+
+    std::ostringstream out;
+
+    out << start << ":\n"
+        << e->block->code << "\n"
+        << e->cond->code << "\n"
+        << "cmp " << e->cond->place << " ,1\n"
+        << "je " << end << "\n"
+        << "jmp " << start << "\n"
+        << end << ":\n"; 
+
+    e->code = out.str();
+    e->data_type = "None";
+
+}
+
+genCode(ForExpr){
+    std::string start = newLabel();
+    std::string end = newLabel();
+
+    genCode(e->assign);
+    genCode(e->limit);
+    genCode(e->block);
+
+    std::ostringstream out;
+
+    out << e->assign->code << "\n"
+        << e->limit->code << "\n"
+        << start << ":\n"
+        << "mov ecx, " << e->limit->place << "\n"
+        << "cmp " << e->assign->place << ", ecx\n"
+        << "jg " << end << "\n"
+        << e->block->code << "\n"
+        << "add " << e->assign->place << ", 1\n"
+        << "jmp " << start << "\n"
+        << end << ": \n";
 
     e->code = out.str();
     e->data_type = "None";
@@ -626,7 +723,7 @@ genCode(ExprList){
     for(const auto& l: e->expr_list){
         genCode(l);
         e->place = l->place;
-        e->code = l->code;
+        e->code += l->code;
         e->data_type = l->data_type;
     }
 }

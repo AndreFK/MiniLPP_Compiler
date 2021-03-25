@@ -114,11 +114,11 @@ namespace Expr{
 %right OpExponente
 
 %type <Ast::Expr*> program expr term factor rvalue variable_decl exponent variable_section assign
-%type <Ast::Expr*> statement statement_list argument_list lvalue constants
+%type <Ast::Expr*> statement statement_list argument_list lvalue constants WhileExpr
+%type <Ast::Expr*> statement_while_list if_statement else_if_list else_if_statement else_statement
 %type <Ast::SubType*> type
 %type <IdList*> id_list
 %%
-
 input: program ;
 
 program: opt_subtype_definition_section
@@ -203,34 +203,49 @@ argument_decl_list: argument_decl_list OpComma type ID
 
 statement_list: statement_list eols statement 
             {
-                $$ = $1;
                 expr_list.push_back($3);
+                $$ = $1;
             }
             |   statement 
             {   
-                $$ = $1;
                 expr_list.push_back($1);
+                $$ = $1;
             };
 
-statement: assign { $$ = $1; }
+statement_while_list: statement_while_list eols statement 
+                    {
+                        $$ = $1;
+                        reinterpret_cast<Ast::ExprList*>($$)->expr_list.push_back($3);
+                    }
+                    | statement 
+                    {
+                        list stmts;
+                        stmts.push_back($1);
+                        $$ = new Ast::ExprList(stmts);
+                    };
+
+statement: assign { $$ = $1;}
         |  KwLlamar ID
         | KwLlamar subprogram_call
-        | KwEscriba argument_list {$$ = new Ast::PrintExpr($2);}
         | KwLea lvalue_list
         | if_statement
-        | KwMientras expr opt_eols
-        KwHaga eols
-        statement_list eols
-        KwFin KwMientras
-        
+        | WhileExpr { $$ = $1;}
+        | KwEscriba argument_list {$$ = new Ast::PrintExpr($2);}
         | KwRepita eols
-        statement_list eols
+        statement_while_list eols 
         KwHasta expr 
-       
+        {$$ = new Ast::DoWhileExpr($3,$6);}
         | KwPara assign KwHasta expr KwHaga eols
-        statement_list eols
+        statement_while_list eols
         KwFin KwPara
+        {$$ = new Ast::ForExpr($2,$4,$7);}
         | KwRetorne expr ;
+
+WhileExpr: KwMientras expr opt_eols
+        KwHaga eols
+        statement_while_list eols
+        KwFin KwMientras
+        {$$ = new Ast::WhileExpr($2, $6);}
 
 assign: ID OpAssign expr {$$ = new Ast::AssignExpr($1,$3);};
 
@@ -244,7 +259,8 @@ opt_expr_list: expr_list
             |  %empty;
 
 expr_list: expr_list OpComma expr 
-        |  expr;
+        |  expr
+        ;
 
 expr: expr OpEqual term {$$ = new Ast::EqExpr($1,$3);}
     | expr OpNotEqual term {$$ = new Ast::NeqExpr($1,$3);}
@@ -269,7 +285,7 @@ exponent: exponent OpExponente rvalue
         | rvalue {$$ = $1;};
 
 rvalue: OPPAR expr CLOSEPAR {$$ = $2;}
-    |   constants 
+    |   constants {$$ = $1;}
     |   lvalue {$$ = $1;}
     |   subprogram_call 
     |   OPSUB expr {$$ = new Ast::UnaryExpr($2);}
@@ -289,18 +305,31 @@ argument_list: argument_list OpComma expr
 
 if_statement: KwSi expr opt_eols
               KwEntonces opt_eols
-              statement_list eols
+              statement eols
               else_if_list
               else_statement
-              KwFin KwSi;
+              KwFin KwSi
+              { $$ = new Ast::IfExpr{$2,$6,$8};};
 
-else_if_list: else_if_list else_if_statement
+else_if_list: else_if_list else_if_statement 
+            {
+                $$ = $1;
+                reinterpret_cast<Ast::ExprList*>($$)->expr_list.push_back($2);
+            }
             | else_if_statement
+            {
+                list stmts;
+                stmts.push_back($1);
+                $$ = new Ast::ExprList(stmts);
+            }
             | %empty;
 
-else_if_statement: KwSino KwSi expr opt_eols KwEntonces opt_eols statement_list eols;
+else_if_statement: KwSino KwSi expr opt_eols 
+                   KwEntonces opt_eols 
+                   statement eols
+                   {$$ = new Ast::ElseIf($3,$7);};
 
-else_statement: KwSino eols statement_list eols
+else_statement: KwSino eols statement eols {$$ = new Ast::ElseExpr($3);}
             |   %empty;
 
 opt_eols: eols
