@@ -119,6 +119,7 @@ namespace Expr{
 %type <Ast::Expr*> statement_while_list if_statement else_if_list else_if_statement else_statement
 %type <Ast::Expr*> subprogram_call expr_list opt_expr_list
 %type <Ast::Expr*> subprogram_decl opt_arguments argument_decl_list
+%type <Ast::Expr*> argument_decl
 %type <Ast::SubType*> type
 %type <IdList*> id_list
 %%
@@ -194,16 +195,26 @@ subprogram_decl: "funcion" ID opt_arguments OpColon type eols
                  opt_variable_section
                  KwInicio opt_eols
                  statement_while_list eols
-                 KwFin;
+                 KwFin { $$ = new Ast::ProcDecl($2,$3,$8);};
 
 opt_arguments: OPPAR argument_decl_list CLOSEPAR {$$ = $2;}
-            |  %empty;
+            |  %empty {$$ = nullptr;};
 
-argument_decl_list: argument_decl_list OpComma argument_decl
-                | argument_decl;
+argument_decl_list: argument_decl_list OpComma argument_decl 
+                {
+                    $$ = $1;
+                    reinterpret_cast<Ast::ExprList*>($$)->expr_list.push_back($3);
+                }
+                | argument_decl 
+                {
+                    list temp;
+                    temp.push_back($1);
+                    $$ = new Ast::ExprList(temp);
+                    //expr_list.push_back($1);
+                };
 
-argument_decl: type ID
-            |  KwVar type ID;
+argument_decl: type ID {$$ = new Ast::ArgDecl($2);}
+            |  KwVar type ID {$$ = new Ast::ArgDecl($3);};
 
 statement_list: statement_list eols statement 
             {
@@ -229,7 +240,7 @@ statement_while_list: statement_while_list eols statement
                     };
 
 statement: assign { $$ = $1;}
-        |  KwLlamar ID
+        |  KwLlamar ID {$$ = new Ast::SubProgramCall($2,nullptr);}
         | KwLlamar subprogram_call {$$ = $2;}
         | KwLea lvalue_list
         | if_statement

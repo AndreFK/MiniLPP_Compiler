@@ -20,14 +20,14 @@ using stdstring = std::string;
 #include "ast.h"
 
 std::unordered_map<std::string, std::string> vars;
-std::unordered_map<std::string, int> local_vars;
+std::unordered_map<std::string, std::string> local_vars;
 std::string xd = "";
 int temp_index = 0;
 int char_temp_index = 0;
 int string_temp_index = 0;
 int label_counter = 0;
 int end_label = 0;
-int arg_index = 0;
+int arg_index = 1;
 stdstring newTemp(){
     return "dword[temp"+std::to_string(temp_index++)+"]";
 }
@@ -47,8 +47,9 @@ stdstring newVar(std::string id, std::string dt){
 
 std::string newLocalVar(std::string id){
     arg_index += 1;
-    local_vars.emplace(id,arg_index*4);
-    return "dword[ebp+"+std::to_string(arg_index*4)+"]";
+    std::string p = "dword[ebp+"+std::to_string(arg_index*4)+"]";
+    local_vars.emplace(id,p);
+    return p;
 }
 
 stdstring newLabel(){
@@ -192,6 +193,12 @@ void resetTemp(){
 }
 
 %node SubProgramDecl Expr = {
+    stdstring id;
+    Expr *args;
+    Expr *expr;
+}
+
+%node ProcDecl Expr = {
     stdstring id;
     Expr *args;
     Expr *expr;
@@ -436,8 +443,22 @@ genCode(StringExpr){
 }
 
 genCode(IdExpr){
-    e->place = "dword["+e->id+"]";
-    e->data_type = vars[e->id];
+    std::ostringstream out;
+    std::unordered_map<std::string,std::string>::const_iterator got = vars.find(e->id);
+    std::unordered_map<std::string,std::string>::const_iterator get = local_vars.find(e->id);
+
+    if ( got == vars.end() ){
+        if(get == local_vars.end()){
+
+        }
+        else{
+            e->place = local_vars[e->id];
+        }
+    }
+    else{
+       e->place = "dword["+e->id+"]";
+       e->data_type = vars[e->id];
+    }
 }
 
 genCode(AssignExpr){ 
@@ -770,7 +791,6 @@ genCode(VarDecl){
 }
 
 genCode(VarSection){
-    std::cout<<"VarSec start\n";
     for(const auto &i : e->varDecls){
         genCode(i);
     }
@@ -778,19 +798,15 @@ genCode(VarSection){
 }
 
 genCode(ArgSection){
-    std::cout<<"ArgSec start\n";
     for(const auto &i : e->argDecls){
         genCode(i);
     }
     e->data_type = "None";
-    std::cout<<"ArgSec end\n";
 }
 
 genCode(ArgDecl){
-    std::cout<<"ArgDecl start\n";
     e->place = newLocalVar(e->id);
     e->data_type = "None";
-    std::cout<<e->place<<"\n";
 }
 
 genCode(ArgList){
@@ -807,21 +823,50 @@ genCode(ArgList){
 
 
 genCode(SubProgramCall){
+    if(e->expr != nullptr){
     genCode(e->expr);
-    //int val = std::stoi(e->place);
-    e->code += e->expr->code;
-    e->code += "call " + e->id + "\n";
-    e->code += "add esp, " + e->expr->place;
+        e->code += e->expr->code;
+        e->code += "call " + e->id + "\n";
+        e->code += "add esp, " + e->expr->place;
+        e->place = "eax";
+    }
+    else{
+        e->code += "call " + e->id + "\n";
+        e->place = "eax";
+    }
 }
 
-genCode(SubProgramDecl){
-
-    //genCode(e->args);
+genCode(ProcDecl){
+    if(e->args!=nullptr){
+        genCode(e->args);
+    }
     genCode(e->expr);
 
     std::ostringstream out;
 
     out << e->id << ":\n"
+        << "push ebp\n"
+        << "mov ebp, esp"
+        << e->expr->code
+        << "mov esp, ebp\n"
+        << "pop ebp\n"
+        << "ret\n";
+    
+    e->code = out.str();
+}
+
+genCode(SubProgramDecl){
+
+    if(e->args!=nullptr){
+        genCode(e->args);
+    }
+    genCode(e->expr);
+
+    std::ostringstream out;
+
+    out << e->id << ":\n"
+        << "push ebp\n"
+        << "mov ebp, esp"
         << e->expr->code;
     
     e->code = out.str();
@@ -829,7 +874,6 @@ genCode(SubProgramDecl){
 }
 
 genCode(Ret){
-    //std::cout<<"Ret start\n";
     genCode(e->expr);
 
     std::ostringstream out;
@@ -841,7 +885,6 @@ genCode(Ret){
         << "ret\n";
 
     e->code = out.str();
-    //std::cout<<"Ret End\n";
 }
 
 genCode(Expr){}

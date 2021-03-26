@@ -157,9 +157,13 @@ void ExeParser(){
         out << i->code << "\n";
     }
 
+    out << "ret\n";
+    
     for(auto &&i : sub_list){
         out << i->code << "\n";
     }
+
+    
 
     std::cout<<out.str();
 }
