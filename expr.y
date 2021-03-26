@@ -6,6 +6,7 @@
 %define api.namespace {Expr}
 
 %parse-param{list &expr_list}
+%parse-param{list &sub_list}
 
 %code requires{
     #include <string>
@@ -116,6 +117,8 @@ namespace Expr{
 %type <Ast::Expr*> program expr term factor rvalue variable_decl exponent variable_section assign
 %type <Ast::Expr*> statement statement_list argument_list lvalue constants WhileExpr
 %type <Ast::Expr*> statement_while_list if_statement else_if_list else_if_statement else_statement
+%type <Ast::Expr*> subprogram_call expr_list opt_expr_list
+%type <Ast::Expr*> subprogram_decl opt_arguments argument_decl_list
 %type <Ast::SubType*> type
 %type <IdList*> id_list
 %%
@@ -179,27 +182,28 @@ id_list: id_list OpComma ID
 opt_subprogram_decl: subprogram_decl_list eols
                    | %empty;
 
-subprogram_decl_list: subprogram_decl_list eols subprogram_decl
-                    | subprogram_decl;
+subprogram_decl_list: subprogram_decl_list eols subprogram_decl {sub_list.push_back($3);} 
+                    | subprogram_decl {sub_list.push_back($1);};
                 
 subprogram_decl: "funcion" ID opt_arguments OpColon type eols
                  opt_variable_section
                  KwInicio opt_eols
-                 statement_list eols
-                 KwFin
+                 statement_while_list eols
+                 KwFin { $$ = new Ast::SubProgramDecl($2,$3,$10);}
                | KwProcedimiento ID opt_arguments eols
                  opt_variable_section
                  KwInicio opt_eols
-                 statement_list eols
+                 statement_while_list eols
                  KwFin;
 
-opt_arguments: OPPAR argument_decl_list CLOSEPAR
+opt_arguments: OPPAR argument_decl_list CLOSEPAR {$$ = $2;}
             |  %empty;
 
-argument_decl_list: argument_decl_list OpComma type ID
-                |   argument_decl_list OpComma KwVar type ID
-                |   type ID
-                |   KwVar type ID;
+argument_decl_list: argument_decl_list OpComma argument_decl
+                | argument_decl;
+
+argument_decl: type ID
+            |  KwVar type ID;
 
 statement_list: statement_list eols statement 
             {
@@ -226,7 +230,7 @@ statement_while_list: statement_while_list eols statement
 
 statement: assign { $$ = $1;}
         |  KwLlamar ID
-        | KwLlamar subprogram_call
+        | KwLlamar subprogram_call {$$ = $2;}
         | KwLea lvalue_list
         | if_statement
         | WhileExpr { $$ = $1;}
@@ -239,7 +243,7 @@ statement: assign { $$ = $1;}
         statement_while_list eols
         KwFin KwPara
         {$$ = new Ast::ForExpr($2,$4,$7);}
-        | KwRetorne expr ;
+        | KwRetorne expr {$$ = new Ast::Ret($2);};
 
 WhileExpr: KwMientras expr opt_eols
         KwHaga eols
@@ -255,11 +259,20 @@ lvalue_list: lvalue_list OpComma lvalue
 lvalue: ID {$$ = new Ast::IdExpr($1);}
     |   ID OpenBracket expr CloseBracket;
 
-opt_expr_list: expr_list 
+opt_expr_list: expr_list {$$ = $1;}
             |  %empty;
 
 expr_list: expr_list OpComma expr 
-        |  expr
+        {
+            $$ = $1;
+            reinterpret_cast<Ast::ArgList*>($$)->expr_list.push_back($3);
+        }
+        |  expr 
+        {   
+            list stmts;
+            stmts.push_back($1);
+            $$ = new Ast::ArgList(stmts);
+        }
         ;
 
 expr: expr OpEqual term {$$ = new Ast::EqExpr($1,$3);}
@@ -287,7 +300,7 @@ exponent: exponent OpExponente rvalue
 rvalue: OPPAR expr CLOSEPAR {$$ = $2;}
     |   constants {$$ = $1;}
     |   lvalue {$$ = $1;}
-    |   subprogram_call 
+    |   subprogram_call {$$ = $1;}
     |   OPSUB expr {$$ = new Ast::UnaryExpr($2);}
     |   OpNot expr {$$ = new Ast::NotExpr($2);};
 
@@ -296,7 +309,7 @@ constants: intConstant {$$ = new Ast::NumExpr($1);}
         |  OpTrue {$$ = new Ast::TrueExpr();}
         |  OpFalse {$$ = new Ast::FalseExpr();};
 
-subprogram_call: ID OPPAR opt_expr_list CLOSEPAR;
+subprogram_call: ID OPPAR opt_expr_list CLOSEPAR {$$ = new Ast::SubProgramCall($1,$3);};
 
 argument_list: argument_list OpComma expr
             |  argument_list OpComma stringConstant

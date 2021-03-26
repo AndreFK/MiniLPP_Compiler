@@ -20,13 +20,14 @@ using stdstring = std::string;
 #include "ast.h"
 
 std::unordered_map<std::string, std::string> vars;
+std::unordered_map<std::string, int> local_vars;
 std::string xd = "";
 int temp_index = 0;
 int char_temp_index = 0;
 int string_temp_index = 0;
 int label_counter = 0;
 int end_label = 0;
-
+int arg_index = 0;
 stdstring newTemp(){
     return "dword[temp"+std::to_string(temp_index++)+"]";
 }
@@ -42,6 +43,12 @@ std::string newStringTemp(){
 stdstring newVar(std::string id, std::string dt){
     vars.emplace(id, dt);
     return "dword["+id+"]";
+}
+
+std::string newLocalVar(std::string id){
+    arg_index += 1;
+    local_vars.emplace(id,arg_index*4);
+    return "dword[ebp+"+std::to_string(arg_index*4)+"]";
 }
 
 stdstring newLabel(){
@@ -118,11 +125,6 @@ void resetTemp(){
     stdstring id;
 }
 
-%node VarDecl Expr = {
-    SubType *type;
-    IdList *ids;
-}
-
 %node AssignExpr Expr = {
     stdstring id;
     Expr *expr;
@@ -168,6 +170,10 @@ void resetTemp(){
     list expr_list;
 }
 
+%node ArgList Expr = {
+    list expr_list;
+}
+
 %node RootExpr Expr = {
 
 }
@@ -176,16 +182,42 @@ void resetTemp(){
     Expr *expr;
 }
 
+%node Ret Expr = {
+    Expr *expr;
+}
+
+%node SubProgramCall Expr = {
+    stdstring id;
+    Expr * expr;
+}
+
+%node SubProgramDecl Expr = {
+    stdstring id;
+    Expr *args;
+    Expr *expr;
+}
+
+%node ArgSection Expr = {
+    list argDecls;
+}
+
+%node ArgDecl Expr = {
+    stdstring id;
+}
+
 %node VarSection Expr = {
     list varDecls;
+}
+
+%node VarDecl Expr = {
+    SubType *type;
+    IdList *ids;
 }
 
 %node ArrayType Expr = {
     Expr *size;
     Expr *Type;
 }
-
-%node SubProgramExpr Expr= {}
 
 %operation void genCode (Expr *e) 
 %operation void subT(SubType *s)
@@ -428,7 +460,6 @@ genCode(AssignExpr){
     e->code = out.str();
 
     e->data_type = vars[e->id];
-
 }
 
 genCode(EqExpr){
@@ -729,6 +760,7 @@ genCode(ExprList){
 }
 
 genCode(VarDecl){
+    
     subT(e->type);
     std::string type = e->type->name;
     for(const auto &id : *e->ids){
@@ -738,9 +770,79 @@ genCode(VarDecl){
 }
 
 genCode(VarSection){
+    std::cout<<"VarSec start\n";
     for(const auto &i : e->varDecls){
         genCode(i);
     }
     e->data_type = "None";
 }
+
+genCode(ArgSection){
+    std::cout<<"ArgSec start\n";
+    for(const auto &i : e->argDecls){
+        genCode(i);
+    }
+    e->data_type = "None";
+    std::cout<<"ArgSec end\n";
+}
+
+genCode(ArgDecl){
+    std::cout<<"ArgDecl start\n";
+    e->place = newLocalVar(e->id);
+    e->data_type = "None";
+    std::cout<<e->place<<"\n";
+}
+
+genCode(ArgList){
+    int x = 0;
+    for(const auto& l: e->expr_list){
+        x+=1*4;
+        genCode(l);
+        e->code += l->code + "\n";
+        e->code += "push " + l->place  + "\n";
+        e->data_type = l->data_type;
+    }
+    e->place = std::to_string(x);
+}
+
+
+genCode(SubProgramCall){
+    genCode(e->expr);
+    //int val = std::stoi(e->place);
+    e->code += e->expr->code;
+    e->code += "call " + e->id + "\n";
+    e->code += "add esp, " + e->expr->place;
+}
+
+genCode(SubProgramDecl){
+    std::cout<<"SubProgDec\n";
+
+    //genCode(e->args);
+    genCode(e->expr);
+
+    std::ostringstream out;
+
+    out << e->id << ":\n"
+        << e->expr->code;
+    
+    e->code = out.str();
+    std::cout<<"SubProgDecEnd\n";
+}
+
+genCode(Ret){
+    //std::cout<<"Ret start\n";
+    genCode(e->expr);
+
+    std::ostringstream out;
+
+    out << e->expr->code<<"\n"
+        << "mov eax, " << e->expr->place <<"\n"
+        << "mov esp, ebp\n"
+        << "pop ebp\n"
+        << "ret\n";
+
+    e->code = out.str();
+    //std::cout<<"Ret End\n";
+}
+
 genCode(Expr){}

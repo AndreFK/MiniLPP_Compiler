@@ -14,6 +14,7 @@ extern std::string xd;
 extern std::unordered_map<std::string, std::string> vars;
 std::ostringstream out;
 std::vector<Ast::Expr*> expr_list;
+std::vector<Ast::Expr*>sub_list;
 
 std::string TokenToString(Expr::Parser::token::yytokentype tk){
     switch(tk){
@@ -102,7 +103,7 @@ void ExeLexer(){
 }
 
 void ExeParser(){
-    Expr::Parser parser(expr_list);
+    Expr::Parser parser(expr_list, sub_list);
     try{
         parser();
     }
@@ -111,6 +112,10 @@ void ExeParser(){
     }
 
     for(auto &&i : expr_list){
+        Ast::genCode(i);
+    }
+
+    for(auto &&i : sub_list){
         Ast::genCode(i);
     }
 
@@ -149,6 +154,10 @@ void ExeParser(){
         << "main: \n";
 
     for(auto &&i : expr_list){
+        out << i->code << "\n";
+    }
+
+    for(auto &&i : sub_list){
         out << i->code << "\n";
     }
 
