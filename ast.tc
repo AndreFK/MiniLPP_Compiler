@@ -815,7 +815,6 @@ genCode(SubProgramCall){
 }
 
 genCode(SubProgramDecl){
-    std::cout<<"SubProgDec\n";
 
     //genCode(e->args);
     genCode(e->expr);
@@ -826,7 +825,7 @@ genCode(SubProgramDecl){
         << e->expr->code;
     
     e->code = out.str();
-    std::cout<<"SubProgDecEnd\n";
+
 }
 
 genCode(Ret){
